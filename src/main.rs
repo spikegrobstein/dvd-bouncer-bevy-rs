@@ -9,6 +9,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_startup_system(setup)
+        .add_startup_system(setup_bouncer)
         .add_system(animate_translation)
         .add_system(handle_input)
         .run();
@@ -40,24 +41,63 @@ fn random_color() -> Color {
     Color::rgb(r, g, b)
 }
 
-fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn setup(
+    mut commands: Commands,
+) {
+    commands.spawn_bundle(OrthographicCameraBundle::new_2d());
+}
+
+fn setup_bouncer (
+    mut commands: Commands,
+    windows: Res<Windows>,
+    asset_server: Res<AssetServer>
+) {
     let texture_handle = asset_server.load("dvd_logo.png");
 
-    commands.spawn_bundle(OrthographicCameraBundle::new_2d());
+    let window = windows.get_primary().unwrap();
+
+    // dimensions of our texture
+    let size = Vec2::new(173.5, 100.0);
+
+    let ceiling = window.height() / 2. - size.y / 2.;
+    let ground = -(window.height() / 2.) + size.y / 2.;
+
+    let wall_left = -(window.width() / 2.) + size.x / 2.;
+    let wall_right = window.width() / 2. - size.x / 2.;
+
+    let mut rnd = rand::thread_rng();
+
+    let x_range = std::ops::Range{ start: wall_left, end: wall_right};
+    let y_range = std::ops::Range{ start: ground, end: ceiling};
+
+    let sprite_location = Vec3::new(
+        rnd.gen_range(x_range),
+        rnd.gen_range(y_range),
+        0.0,
+    );
+
+    let dx = match rnd.gen_bool(0.5) {
+        true => 100.0,
+        false => -100.0,
+    };
+    let dy = match rnd.gen_bool(0.5) {
+        true => 100.0,
+        false => -100.0,
+    };
+
     commands.spawn_bundle(SpriteBundle {
         sprite: Sprite {
             color: random_color(),
-            custom_size: Some(Vec2::new(173.5, 100.0)),
+            custom_size: Some(size),
             ..Default::default()
         },
         texture: texture_handle,
         transform: Transform {
-            translation: Vec3::new(0.25, 0.25, 0.25),
+            translation: sprite_location,
             ..Default::default()
         },
         ..Default::default()
-    }).insert(Bouncer { dx: 100.0, dy: 100.0 });
-
+    }).insert(Bouncer { dx, dy });
 }
 
 fn handle_input(keyboard_input: Res<Input<KeyCode>>) {
